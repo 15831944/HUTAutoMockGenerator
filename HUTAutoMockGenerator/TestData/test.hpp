@@ -1,4 +1,7 @@
 /* this is comment */
+#include <iostream>
+#include "testinc.hpp"
+
 namespace np
 {
 	class Test

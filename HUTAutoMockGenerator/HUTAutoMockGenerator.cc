@@ -67,7 +67,7 @@ void print_function_prototype(CXCursor cursor)
 	std::cout << "));" << std::endl;
 }
 
-CXChildVisitResult FindMethods(CXCursor c, CXCursor p, CXClientData cd)
+CXChildVisitResult method_visitor(CXCursor c, CXCursor p, CXClientData cd)
 {
 	CXCursorKind kind = clang_getCursorKind(c);
 	if (kind == CXCursorKind::CXCursor_CXXMethod ||
@@ -79,6 +79,45 @@ CXChildVisitResult FindMethods(CXCursor c, CXCursor p, CXClientData cd)
 	return CXChildVisit_Continue;
 }
 
+CXVisitorResult include_visitor(void* context, CXCursor cursor, CXSourceRange range) {
+
+	CXFile file = clang_getIncludedFile(cursor);
+	std::string filename = ToString(clang_getFileName(file));
+	if (filename.find("Visual Studio") != std::string::npos)
+	{
+		filename = filename.substr(filename.find_last_of("\\") + 1);
+		std::cout << "#include <" << filename << ">" << std::endl;
+	}
+	else
+	{
+		std::cout << "#include \"" << filename << "\"" << std::endl;
+	}
+	return CXVisit_Continue;
+}
+
+std::string GetFileNameFromPath(const std::string& f)
+{
+	if (f.find_last_of("\\") != std::string::npos)
+	{
+		return f.substr(f.find_last_of("\\") + 1);
+	}
+	return f;
+}
+
+CXCursorAndRangeVisitor visitor = {
+  0,
+  include_visitor
+};
+
+void showInclusions(CXTranslationUnit TU, const char* src_filename) {
+
+	CXFile file = clang_getFile(TU, src_filename);
+	
+	CXResult result = clang_findIncludesInFile(TU, file, visitor);
+}
+
+std::string fileName = "TestData\\test.hpp";
+
 int main()
 {
 	CXIndex index = clang_createIndex(0, 0);
@@ -86,11 +125,12 @@ int main()
 		
 	CXErrorCode er = clang_parseTranslationUnit2(
 		index,
-		"TestData\\test.hpp",
+		fileName.c_str(),
 		nullptr,
 		0,
 		nullptr,
 		0,
+		CXTranslationUnit_DetailedPreprocessingRecord |
 		CXTranslationUnit_SkipFunctionBodies,
 		&unit
 	);
@@ -100,18 +140,23 @@ int main()
 		std::cerr << "Unable to parse the input file" << std::endl;
 		return -1;
 	}
-
+	//showInclusions(unit, fileName.c_str());
 	CXCursor cursor = clang_getTranslationUnitCursor(unit);
 	clang_visitChildren(cursor,
 		[](CXCursor c, CXCursor p, CXClientData cd)
 		{
+			std::string name = ToString(clang_getCursorSpelling(c));
+			//std::cout << name << std::endl;
+
 			if (clang_getCursorKind(c) == CXCursorKind::CXCursor_ClassDecl)
 			{
-				std::string name = ToString(clang_getCursorSpelling(c));
 				if (name == "Test")
 				{
 					std::string newName = "Mock" + name;
 					std::string statPointer = "p" + newName;
+					std::cout << "#include \"gmock/gmock.h\"" << std::endl;
+					std::cout << "#include \"" << GetFileNameFromPath(fileName) << "\"" << std::endl;
+					std::cout << std::endl;
 					std::cout << "class Mock" << name << std::endl;
 					std::cout << "{" << std::endl;
 					std::cout << "public:" << std::endl;
@@ -127,7 +172,7 @@ int main()
 					std::cout << "\t" << "}" << std::endl;
 					std::cout << std::endl;
 
-					clang_visitChildren(c, FindMethods, nullptr);
+					clang_visitChildren(c, method_visitor, nullptr);
 					std::cout << "};" << std::endl;
 				}
 			}
@@ -137,5 +182,6 @@ int main()
 
 	clang_disposeTranslationUnit(unit);
 	clang_disposeIndex(index);
+	
 	return 0;
 }

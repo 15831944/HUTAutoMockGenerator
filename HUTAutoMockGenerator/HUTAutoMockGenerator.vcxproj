@@ -159,10 +159,6 @@
   <ItemGroup>
     <ClCompile Include="HUTAutoMockGenerator.cc" />
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="TestData\test.hpp" />
-    <ClInclude Include="TestData\testinc.hpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

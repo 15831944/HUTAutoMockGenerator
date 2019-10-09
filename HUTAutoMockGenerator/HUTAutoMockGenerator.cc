@@ -70,11 +70,15 @@ void print_function_prototype(CXCursor cursor)
 CXChildVisitResult method_visitor(CXCursor c, CXCursor p, CXClientData cd)
 {
 	CXCursorKind kind = clang_getCursorKind(c);
+	//std::cout << "###" << ToString(clang_getCursorSpelling(c)) << "%%%%"
+	//	<< clang_getCursorKindSpelling(clang_getCursorKind(c))  << std::endl;
 	if (kind == CXCursorKind::CXCursor_CXXMethod ||
 		kind == CXCursorKind::CXCursor_FunctionDecl)
 	{
-		
-		print_function_prototype(c);
+		if (!clang_Cursor_isFunctionInlined(c))
+		{
+			print_function_prototype(c);
+		}
 	}
 	return CXChildVisit_Continue;
 }
@@ -117,21 +121,37 @@ void showInclusions(CXTranslationUnit TU, const char* src_filename) {
 }
 
 std::string fileName = "TestData\\test.hpp";
+const char* const params[] = {
+	"-DRN1UTILS_API=__declspec(dllimport)"
+};
 
 int main()
 {
-	CXIndex index = clang_createIndex(0, 0);
+	CXIndex index = clang_createIndex(0, 1);
 	CXTranslationUnit unit;
 		
 	CXErrorCode er = clang_parseTranslationUnit2(
 		index,
 		fileName.c_str(),
-		nullptr,
-		0,
+		params,
+		1,
 		nullptr,
 		0,
 		CXTranslationUnit_DetailedPreprocessingRecord |
-		CXTranslationUnit_SkipFunctionBodies,
+		CXTranslationUnit_Incomplete |
+		CXTranslationUnit_PrecompiledPreamble |
+		CXTranslationUnit_CacheCompletionResults |
+		CXTranslationUnit_ForSerialization |
+		CXTranslationUnit_CXXChainedPCH |
+		CXTranslationUnit_SkipFunctionBodies |
+		CXTranslationUnit_IncludeBriefCommentsInCodeCompletion |
+		CXTranslationUnit_CreatePreambleOnFirstParse |
+		CXTranslationUnit_KeepGoing |
+		CXTranslationUnit_SingleFileParse |
+		CXTranslationUnit_LimitSkipFunctionBodiesToPreamble |
+		CXTranslationUnit_IncludeAttributedTypes |
+		CXTranslationUnit_VisitImplicitAttributes |
+		CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles,
 		&unit
 	);
 
@@ -140,7 +160,9 @@ int main()
 		std::cerr << "Unable to parse the input file" << std::endl;
 		return -1;
 	}
+
 	//showInclusions(unit, fileName.c_str());
+	
 	CXCursor cursor = clang_getTranslationUnitCursor(unit);
 	clang_visitChildren(cursor,
 		[](CXCursor c, CXCursor p, CXClientData cd)
@@ -150,7 +172,7 @@ int main()
 
 			if (clang_getCursorKind(c) == CXCursorKind::CXCursor_ClassDecl)
 			{
-				if (name == "Test")
+				if (name == "CRRecordSet")
 				{
 					std::string newName = "Mock" + name;
 					std::string statPointer = "p" + newName;

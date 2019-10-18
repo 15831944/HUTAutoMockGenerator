@@ -63,10 +63,6 @@ void ClangHandler::processClass(CXCursor c, CXClientData ccd)
 		if (cd->doAllClasses() || name == cd->classNameToMock)
 		{
 			MockClassGenerator mcg(name);
-			std::string newName = mcg.getMockClassName();
-			std::string statPointer = mcg.getInternalPointer();
-			mcg.AddInclude(cd->stream, HUT_Constants::gmockHeader, cd->currentIdent);
-			mcg.AddInclude(cd->stream, GetFileNameFromPath(cd->originalFileName), cd->currentIdent);
 			mcg.addEmptyLine(cd->stream);
 			mcg.startClassDefinition(cd->stream, cd->currentIdent);
 			cd->currentIdent += 1;
@@ -229,7 +225,7 @@ int ClangHandler::Process(int argc, char* argv[])
 	{
 		classToFind = "";
 	}
-	int offset = 3;
+	int offset = 4;
 	int newargc = argc - offset + 1;
 	char** newargv = new char* [newargc];
 	for (auto i = offset; i < argc; ++i)
@@ -238,7 +234,20 @@ int ClangHandler::Process(int argc, char* argv[])
 	}
 	newargv[newargc - 1] = params[0];
 
-	CommonData cd(std::cout, fileName, classToFind);
+	std::string destinationFile(argv[3]);
+	std::ofstream out(destinationFile);
+
+	if (!out.is_open())
+	{
+		std::cerr << "Failed to create destination file, please check you have write access to the location" << std::endl;
+		return -1;
+	}
+	
+	CommonData cd(out, fileName, classToFind, destinationFile);
+	MockClassGenerator mcg("");
+	mcg.AddInclude(cd.stream, HUT_Constants::gmockHeader, cd.currentIdent);
+	mcg.AddInclude(cd.stream, GetFileNameFromPath(cd.originalFileName), cd.currentIdent);
+	
 	CXIndex index = clang_createIndex(0, 0);
 	CXTranslationUnit unit;
 	

@@ -5,12 +5,12 @@
 class CommonData
 {
 public:
-	CommonData(std::ostream& st, const std::string& orgFN, const std::string& clasName) :
+	CommonData(std::ostream& st, const std::string& orgFN, const std::string& clasName, const std::string& outputFileName) :
 		currentIdent(0),
 		stream(st),
 		originalFileName(orgFN),
 		currentFileName(orgFN),
-		destinationFileName(""),
+		destinationFileName(outputFileName),
 		classNameToMock(clasName)
 	{		
 	}

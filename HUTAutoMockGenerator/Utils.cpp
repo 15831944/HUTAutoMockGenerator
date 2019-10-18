@@ -19,3 +19,12 @@ std::string tabIndent(int level)
 {
 	return std::string(level * 4, ' ');
 }
+
+std::string GetFileNameFromPath(const std::string& f)
+{
+	if (f.find_last_of("\\") != std::string::npos)
+	{
+		return f.substr(f.find_last_of("\\") + 1);
+	}
+	return f;
+}

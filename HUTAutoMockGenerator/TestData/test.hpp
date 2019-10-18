@@ -358,3 +358,11 @@ public:
 
 
 };
+
+class TestClass
+{
+public:
+	TestClass();
+	~TestClass();
+	int testMethod(int a);
+};

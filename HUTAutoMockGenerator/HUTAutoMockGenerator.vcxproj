@@ -157,12 +157,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ClangCallBacks.cpp" />
+    <ClCompile Include="ClangHandler.cpp" />
     <ClCompile Include="HUTAutoMockGenerator.cc" />
     <ClCompile Include="MockClassGenerator.cpp" />
     <ClCompile Include="MockMethodGenerator.cpp" />
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClangCallBacks.h" />
+    <ClInclude Include="ClangHandler.h" />
     <ClInclude Include="CommonData.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="MockClassGenerator.h" />

@@ -103,7 +103,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..\Utilities\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -158,6 +158,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="HUTAutoMockGenerator.cc" />
+    <ClCompile Include="MockClassGenerator.cpp" />
+    <ClCompile Include="MockMethodGenerator.cpp" />
+    <ClCompile Include="Utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CommonData.h" />
+    <ClInclude Include="Constants.h" />
+    <ClInclude Include="MockClassGenerator.h" />
+    <ClInclude Include="MockMethodGenerator.h" />
+    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

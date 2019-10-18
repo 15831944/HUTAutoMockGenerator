@@ -2,82 +2,57 @@
 #include <string>
 #include <sstream>
 #include <clang-c/Index.h>
+#include <set>
+#include <chrono>
+#include <fstream>
 
-std::ostream& operator<<(std::ostream& stream, const CXString& str)
+#include "Utils.h"
+#include "MockClassGenerator.h"
+#include "MockMethodGenerator.h"
+#include "Constants.h"
+#include "CommonData.h"
+
+void print_function_prototype(CXCursor cursor, CXClientData ccd)
 {
-	stream << clang_getCString(str);
-	clang_disposeString(str);
-	return stream;
-}
-
-std::string ToString(const CXString& s)
-{
-	std::string result = clang_getCString(s);
-	clang_disposeString(s);
-	return result;
-}
-
-void parseUsrString(const std::string& usrString, bool* isConst) {
-	size_t bangLocation = usrString.find("#&");
-	if (bangLocation == std::string::npos || bangLocation == usrString.length() - 1) {
-		*isConst = false;
+	CommonData *cd = nullptr;
+	if (ccd != nullptr)
+	{
+		cd = (CommonData*)ccd;
+	}
+	else
+	{
 		return;
 	}
-	bangLocation += 2;
-	int x = usrString[bangLocation];
 
-	*isConst = x & 0x1;
-}
-
-void print_function_prototype(CXCursor cursor)
-{
 	auto type = clang_getCursorType(cursor);
 	
 	auto function_name = ToString(clang_getCursorSpelling(cursor));
 	auto return_type = ToString(clang_getTypeSpelling(clang_getResultType(type)));
-	CXString usr = clang_getCursorUSR(cursor);
-	std::string usr_string = ToString(usr);
-	bool isConst = false;
-	parseUsrString(usr_string, &isConst);
-	std::string MockMacro = "MOCK_METHOD";
-	if (isConst)
-	{
-		MockMacro = "MOCK_CONST_METHOD";
-	}
 	int num_args = clang_Cursor_getNumArguments(cursor);
-	std::cout << "\t" << MockMacro << num_args << "("
-		<< function_name << ", " << return_type << "(";
+	MockMethodGenerator mmg;
+	mmg.startMockMethod(cd->stream, function_name, num_args, return_type, clang_CXXMethod_isConst(cursor), cd->currentIdent);
+
 	for (int i = 0; i < num_args; ++i)
 	{
 		auto arg_cursor = clang_Cursor_getArgument(cursor, i);
 		auto arg_name = ToString(clang_getCursorSpelling(arg_cursor));
-		if (arg_name.empty())
-		{
-			arg_name = "no name!";
-		}
-
+		
 		auto arg_data_type = ToString(clang_getTypeSpelling(clang_getArgType(type, i)));
-		std::cout << arg_data_type << " " << arg_name;
-		if (i != num_args - 1)
-		{
-			std::cout << ", ";
-		}
+		mmg.addParameter(cd->stream, arg_data_type, arg_name, i == num_args - 1);
 	}
 
-	std::cout << "));" << std::endl;
+	mmg.endMockMethod(cd->stream);
 }
 
 CXChildVisitResult method_visitor(CXCursor c, CXCursor p, CXClientData cd)
 {
 	CXCursorKind kind = clang_getCursorKind(c);
-	//std::cout << "###" << ToString(clang_getCursorSpelling(c)) << "%%%%"
-	//	<< clang_getCursorKindSpelling(clang_getCursorKind(c))  << std::endl;
 	if (kind == CXCursorKind::CXCursor_CXXMethod ||
 		kind == CXCursorKind::CXCursor_FunctionDecl)
 	{
 		if (!clang_Cursor_isFunctionInlined(c))
 		{
-			print_function_prototype(c);
+			print_function_prototype(c, cd);
 		}
 	}
 	return CXChildVisit_Continue;
@@ -122,19 +97,35 @@ void showInclusions(CXTranslationUnit TU, const char* src_filename) {
 
 std::string fileName = "TestData\\test.hpp";
 const char* const params[] = {
-	"-DRN1UTILS_API=__declspec(dllimport)"
+	"-DRN1UTILS_API=__declspec(dllimport)",
+	"-ferror-limit=1000"
 };
 
-int main()
+void cleanIndex(CXIndex& index)
 {
-	CXIndex index = clang_createIndex(0, 1);
-	CXTranslationUnit unit;
-		
+	if (index != nullptr)
+	{
+		clang_disposeIndex(index);
+		index = nullptr;
+	}
+}
+
+void cleanTranslationUnit(CXTranslationUnit& unit)
+{
+	if (unit != nullptr)
+	{
+		clang_disposeTranslationUnit(unit);
+		unit = nullptr;
+	}
+}
+
+bool Parse(std::string file, CXIndex& index, CXTranslationUnit* unit)
+{
 	CXErrorCode er = clang_parseTranslationUnit2(
 		index,
-		fileName.c_str(),
+		file.c_str(),
 		params,
-		1,
+		2,
 		nullptr,
 		0,
 		CXTranslationUnit_DetailedPreprocessingRecord |
@@ -152,58 +143,150 @@ int main()
 		CXTranslationUnit_IncludeAttributedTypes |
 		CXTranslationUnit_VisitImplicitAttributes |
 		CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles,
-		&unit
+		unit
 	);
 
 	if (unit == nullptr || er != CXErrorCode::CXError_Success)
 	{
 		std::cerr << "Unable to parse the input file" << std::endl;
-		return -1;
+		return false;
+	}
+	return true;
+}
+
+bool CheckUnknownTypesAndFix(CXTranslationUnit& unit, CXIndex& index, std::string file, int remaining = 3)
+{
+	if (remaining == 0)
+	{
+		return false;
 	}
 
-	//showInclusions(unit, fileName.c_str());
-	
-	CXCursor cursor = clang_getTranslationUnitCursor(unit);
-	clang_visitChildren(cursor,
-		[](CXCursor c, CXCursor p, CXClientData cd)
+	--remaining;
+	auto count = clang_getNumDiagnostics(unit);
+	std::set<std::string> errors;
+	if (count != 0)
+	{
+		for (unsigned int i = 0; i < count; ++i)
 		{
-			std::string name = ToString(clang_getCursorSpelling(c));
-			//std::cout << name << std::endl;
-
-			if (clang_getCursorKind(c) == CXCursorKind::CXCursor_ClassDecl)
+			CXDiagnostic diag = clang_getDiagnostic(unit, i);
+			std::string val = ToString(clang_getDiagnosticSpelling(diag));
+			if (val.find("unknown type name") != std::string::npos)
 			{
-				if (name == "CRRecordSet")
+				auto pos1 = val.find('\'');
+				auto pos2 = val.rfind('\'');
+				if (pos1 != std::string::npos && pos2 != std::string::npos)
 				{
-					std::string newName = "Mock" + name;
-					std::string statPointer = "p" + newName;
-					std::cout << "#include \"gmock/gmock.h\"" << std::endl;
-					std::cout << "#include \"" << GetFileNameFromPath(fileName) << "\"" << std::endl;
-					std::cout << std::endl;
-					std::cout << "class Mock" << name << std::endl;
-					std::cout << "{" << std::endl;
-					std::cout << "public:" << std::endl;
-					std::cout << "\t" << "static " << newName << "* " << statPointer << ";" << std::endl;
-					std::cout << "\t" << newName << "()" << std::endl;
-					std::cout << "\t" << "{" << std::endl;
-					std::cout << "\t\t" << statPointer << " = this;" << std::endl;
-					std::cout << "\t" << "}" << std::endl;
-					std::cout << std::endl;
-					std::cout << "\t" << "~" << newName << "()" << std::endl;
-					std::cout << "\t" << "{" << std::endl;
-					std::cout << "\t\t" << statPointer << " = nullptr;" << std::endl;
-					std::cout << "\t" << "}" << std::endl;
-					std::cout << std::endl;
-
-					clang_visitChildren(c, method_visitor, nullptr);
-					std::cout << "};" << std::endl;
+					errors.insert(val.substr(pos1 + 1, pos2 - pos1 - 1));
 				}
 			}
-			return CXChildVisit_Recurse;
-		},
-		nullptr);
+			clang_disposeDiagnostic(diag);
+		}
 
-	clang_disposeTranslationUnit(unit);
-	clang_disposeIndex(index);
+		std::string lineToInsert = "";
+		for (auto itr : errors)
+		{
+			lineToInsert = lineToInsert + "typedef int " + itr + ";\n";
+		}
+		if (!lineToInsert.empty())
+		{
+			cleanTranslationUnit(unit);
+
+			time_t now = time(0);
+			tm* ltm = localtime(&now);
+			char buffer[80];
+			strftime(buffer, 80, "%d%B%Y%H%M%S", ltm);
+			std::string newFile = file;
+			newFile.insert(newFile.find('.'), buffer);
+			std::cout << newFile << std::endl;
+			std::ifstream in(file);
+			std::ofstream out(newFile);
+			if (in.is_open() && out.is_open())
+			{
+				out << lineToInsert;
+				std::string line;
+				while (std::getline(in, line))
+				{
+					out << line << "\n";
+				}
+				in.close();
+				out.close();
+				if (!Parse(newFile, index, &unit))
+				{
+					cleanIndex(index);
+					return false;
+				}
+				if (!CheckUnknownTypesAndFix(unit, index, newFile, remaining))
+				{
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+CXChildVisitResult classVisitor(CXCursor c, CXCursor p, CXClientData ccd)
+{	
+	CommonData* cd = nullptr;
+	if (ccd != nullptr)
+	{
+		cd = (CommonData*)ccd;
+	}
+	else
+	{
+		return CXChildVisit_Recurse;
+	}
+
+	std::string name = ToString(clang_getCursorSpelling(c));
+	if (clang_getCursorKind(c) == CXCursorKind::CXCursor_ClassDecl)
+	{
+		if (!cd->doAllClasses() && name == cd->classNameToMock)
+		{
+			MockClassGenerator mcg(name);
+			std::string newName = mcg.getMockClassName();
+			std::string statPointer = mcg.getInternalPointer();
+			mcg.AddInclude(cd->stream, HUT_Constants::gmockHeader, cd->currentIdent);
+			mcg.AddInclude(cd->stream, GetFileNameFromPath(fileName), cd->currentIdent);
+			mcg.addEmptyLine(cd->stream);
+			mcg.startClassDefinition(cd->stream, cd->currentIdent);
+			cd->currentIdent += 1;
+			mcg.addMockInternalPointer(cd->stream, cd->currentIdent);
+			mcg.addMockConstructor(cd->stream, cd->currentIdent);
+			mcg.addMockDestructor(cd->stream, cd->currentIdent);
+			mcg.addEmptyLine(cd->stream);
+
+			clang_visitChildren(c, method_visitor, cd);
+
+			cd->currentIdent -= 1;
+			mcg.endClassDefinition(cd->stream, cd->currentIdent);
+		}
+	}
+	return CXChildVisit_Recurse;
+}
+
+int main()
+{
+	CommonData cd(std::cout, fileName, "CRRecordSet");
+	CXIndex index = clang_createIndex(0, 0);
+	CXTranslationUnit unit;
+	if (!Parse(fileName, index, &unit))
+	{
+		cleanIndex(index);
+		return -1;
+	}
+	if (!CheckUnknownTypesAndFix(unit, index, fileName))
+	{
+		cleanTranslationUnit(unit);
+		cleanIndex(index);
+		return -1;
+	}
+	
+	CXCursor cursor = clang_getTranslationUnitCursor(unit);
+
+	clang_visitChildren(cursor, classVisitor, &cd);
+
+	cleanTranslationUnit(unit);
+	cleanIndex(index);
 	
 	return 0;
 }

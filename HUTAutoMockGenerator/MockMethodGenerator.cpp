@@ -14,14 +14,6 @@ void MockMethodGenerator::startMockMethod(std::ostream& stream, std::string name
 		<< HUT_Constants::OpenParanthesis;
 }
 
-void MockMethodGenerator::addParameter(std::ostream& stream, std::string type, std::string name, bool isLast)
-{
-	stream << type
-		<< HUT_Constants::Space
-		<< name
-		<< (isLast ? HUT_Constants::EmptyString : HUT_Constants::CommaSpace);
-}
-
 void MockMethodGenerator::endMockMethod(std::ostream& stream)
 {
 	stream << HUT_Constants::CloseParanthesis

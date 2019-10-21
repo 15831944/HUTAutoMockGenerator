@@ -2,8 +2,9 @@
 #include <iostream>
 #include <sstream>
 #include "Utils.h"
+#include "BaseGenerator.h"
 
-class MockClassGenerator
+class MockClassGenerator : public BaseGenerator
 {
 private:
 	std::string m_mockClassName;
@@ -22,8 +23,6 @@ public:
 		return m_mockInternalPointer;
 	}
 
-	void addEmptyLine(std::ostream& stream) { stream << std::endl; }
-	void AddInclude(std::ostream& stream, const std::string& file, int level = 0);
 	void startClassDefinition(std::ostream& stream, int level = 0);
 	void addMockInternalPointer(std::ostream& stream, int level = 0);
 	void addMockConstructor(std::ostream& stream, int level = 0);

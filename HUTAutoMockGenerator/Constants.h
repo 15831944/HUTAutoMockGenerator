@@ -31,4 +31,9 @@ namespace HUT_Constants
 	const std::string EmptyString = " ";
 	const std::string Pointer = "*";
 	const std::string Static = "static";
+	const std::string Constant = "const";
+	const std::string ScopeResolutionOperator = "::";
+	const std::string PointerDirectOperator = "->";
+	const std::string MemberDirectOperator = ".";
+	const std::string Return = "return";
 }

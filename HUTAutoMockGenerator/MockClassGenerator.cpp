@@ -7,15 +7,6 @@ MockClassGenerator::MockClassGenerator(std::string org_className)
 	m_mockInternalPointer = HUT_Constants::prefixToInternalPointer + m_mockClassName;
 }
 
-void MockClassGenerator::AddInclude(std::ostream& stream, const std::string& file, int level)
-{
-	stream << tabIndent(level)
-		<< HUT_Constants::includeStatementStart
-		<< file
-		<< HUT_Constants::includeStatementEnd
-		<< HUT_Constants::EndLine;
-}
-
 void MockClassGenerator::startClassDefinition(std::ostream& stream, int level)
 {
 	stream << tabIndent(level)

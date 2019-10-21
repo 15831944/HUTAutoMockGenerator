@@ -3,6 +3,7 @@
 #include <string>
 #include <algorithm>
 #include <ctype.h>
+#include "ClassSourceGenerator.h"
 
 ClangHandler* ClangHandler::m_instance = nullptr;
 
@@ -31,7 +32,8 @@ void ClangHandler::processMethod(CXCursor cursor, CXClientData ccd)
 			int num_args = clang_Cursor_getNumArguments(cursor);
 			MockMethodGenerator mmg;
 			mmg.startMockMethod(cd->stream, function_name, num_args, return_type, clang_CXXMethod_isConst(cursor), cd->currentIdent);
-
+			cd->csg->startMethodDefinition(cd->streamSource, return_type, function_name, cd->currentSourceIdent);
+			
 			for (int i = 0; i < num_args; ++i)
 			{
 				auto arg_cursor = clang_Cursor_getArgument(cursor, i);
@@ -39,8 +41,15 @@ void ClangHandler::processMethod(CXCursor cursor, CXClientData ccd)
 
 				auto arg_data_type = ToString(clang_getTypeSpelling(clang_getArgType(type, i)));
 				mmg.addParameter(cd->stream, arg_data_type, arg_name, i == num_args - 1);
+
+				cd->csg->addParameter(cd->streamSource, arg_data_type, arg_name, i == num_args - 1);
 			}
+
 			mmg.endMockMethod(cd->stream);
+			cd->csg->endMethodDefinition(cd->streamSource, clang_CXXMethod_isConst(cursor), cd->currentSourceIdent);
+			cd->csg->startMethodBody(cd->streamSource, cd->currentSourceIdent);
+			cd->csg->generateMethodBody(cd->streamSource, cd->currentSourceIdent + 1);
+			cd->csg->endMethodBody(cd->streamSource, cd->currentSourceIdent);
 		}
 	}
 }
@@ -70,6 +79,11 @@ void ClangHandler::processClass(CXCursor c, CXClientData ccd)
 			mcg.addMockConstructor(cd->stream, cd->currentIdent);
 			mcg.addMockDestructor(cd->stream, cd->currentIdent);
 			mcg.addEmptyLine(cd->stream);
+
+			ClassSourceGenerator csg(name, mcg.getMockClassName(), mcg.getInternalPointer());
+			cd->csg = &csg;
+			csg.addEmptyLine(cd->streamSource);
+			csg.defineMockClassPointer(cd->streamSource, cd->currentSourceIdent);
 
 			clang_visitChildren(c, method_visitor, cd);
 
@@ -174,7 +188,7 @@ bool ClangHandler::CheckUnknownTypesAndFix(CXTranslationUnit& unit, CXIndex& ind
 			char buffer[80];
 			strftime(buffer, 80, "%d%B%Y%H%M%S", ltm);
 			std::string newFile = file;
-			newFile.insert(newFile.find('.'), buffer);
+			newFile.insert(newFile.find_last_of('.'), buffer);
 			std::ifstream in(file);
 			std::ofstream out(newFile);
 			if (in.is_open() && out.is_open())
@@ -234,20 +248,40 @@ int ClangHandler::Process(int argc, char* argv[])
 	}
 	newargv[newargc - 1] = params[0];
 
-	std::string destinationFile(argv[3]);
+	std::string destinationFolder(argv[3]);
+
+	std::string onlyFileName = GetOnlyFileName(fileName);
+
+	std::string onlyDestFileName = "Mock";
+	onlyDestFileName += onlyFileName + ".h";
+	std::string destinationFile(destinationFolder);
+	destinationFile += "\\" + onlyDestFileName;
 	std::ofstream out(destinationFile);
+
+	std::string onlyDestCppFileName = onlyFileName;
+	onlyDestCppFileName += ".cpp";
+	std::string destinationCppFile(destinationFolder);
+	destinationCppFile += "\\" + onlyDestCppFileName;
+	std::ofstream sout(destinationCppFile);
 
 	if (!out.is_open())
 	{
 		std::cerr << "Failed to create destination file, please check you have write access to the location" << std::endl;
 		return -1;
 	}
+	if (!sout.is_open())
+	{
+		std::cerr << "Failed to create destination file, please check you have write access to the location" << std::endl;
+		return -1;
+	}
 	
-	CommonData cd(out, fileName, classToFind, destinationFile);
+	CommonData cd(out, fileName, classToFind, onlyDestFileName, destinationCppFile, sout);
 	MockClassGenerator mcg("");
 	mcg.AddInclude(cd.stream, HUT_Constants::gmockHeader, cd.currentIdent);
 	mcg.AddInclude(cd.stream, GetFileNameFromPath(cd.originalFileName), cd.currentIdent);
-	
+	ClassSourceGenerator csg("", "", "");
+	csg.AddInclude(cd.streamSource, GetFileNameFromPath(cd.currentFileName), cd.currentSourceIdent);
+
 	CXIndex index = clang_createIndex(0, 0);
 	CXTranslationUnit unit;
 	

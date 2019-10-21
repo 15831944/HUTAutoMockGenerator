@@ -6,7 +6,7 @@ int main(int argc, char* argv[])
 	{
 		std::cerr << "invalid format" << std::endl
 			<< "Usage:" << std::endl
-			<< "\t HUTAutoMockGenerator.exe <filename to parse> <class to find> <filename to output>" << std::endl << std::endl
+			<< "\t HUTAutoMockGenerator.exe <filename to parse> <class to find> <folder to output>" << std::endl << std::endl
 			<< "**Note: want all classes to mock => <class to find> = all" << std::endl;
 		return -1;
 	}

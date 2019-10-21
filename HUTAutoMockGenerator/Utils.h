@@ -8,3 +8,4 @@ std::ostream& operator<<(std::ostream& stream, const CXString& str);
 std::string ToString(const CXString& s);
 std::string tabIndent(int level);
 std::string GetFileNameFromPath(const std::string& f);
+std::string GetOnlyFileName(const std::string& f);

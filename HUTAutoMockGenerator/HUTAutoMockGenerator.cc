@@ -1,6 +1,7 @@
+#include "HUTAutoMockGenerator.h"
 #include "ClangHandler.h"
 
-int main(int argc, char* argv[])
+int HUTAutoMockGenerator(int argc, char* argv[])
 {
 	if (argc < 5)
 	{

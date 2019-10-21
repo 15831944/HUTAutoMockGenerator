@@ -36,7 +36,7 @@ std::string GetOnlyFileName(const std::string& fileName)
 	std::string onlyFileName = "";
 	if (pos1 != std::string::npos && pos2 != std::string::npos)
 	{
-		onlyFileName = fileName.substr(pos1 + 1, pos2 - pos1);
+		onlyFileName = fileName.substr(pos1 + 1, pos2 - pos1 - 1);
 	}
 	else if (pos1 != std::string::npos)
 	{

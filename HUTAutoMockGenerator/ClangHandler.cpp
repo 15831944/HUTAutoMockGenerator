@@ -225,8 +225,11 @@ bool ClangHandler::ParseAndCheck(std::string fileName, int argc, char* argv[], C
 	return true;
 }
 
-char params[1][500] = {
-	"-ferror-limit=10000"
+const int paramsLen = 3;
+char params[paramsLen][500] = {
+	"-ferror-limit=10000",
+	"-std=c++11",
+	"-fPIC"
 };
 
 int ClangHandler::Process(int argc, char* argv[])
@@ -240,13 +243,18 @@ int ClangHandler::Process(int argc, char* argv[])
 		classToFind = "";
 	}
 	int offset = 3;
-	int newargc = argc - offset + 1;
+	int newargc = argc - offset + paramsLen;
 	char** newargv = new char* [newargc];
-	for (auto i = offset; i < argc; ++i)
+
+	auto i = 0;
+	for (; i < argc - offset; ++i)
 	{
-		newargv[i - offset] = argv[i];
+		newargv[i] = argv[i + offset];
 	}
-	newargv[newargc - 1] = params[0];
+	for (int j = 0; i < newargc && j < paramsLen; ++i, ++j)
+	{
+		newargv[i] = params[j];
+	}
 
 	std::string destinationFolder(argv[2]);
 

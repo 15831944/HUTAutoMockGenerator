@@ -31,7 +31,7 @@ public:
 		const std::string& methodName, int level = 0);
 	void endMethodDefinition(std::ostream& stream, bool isConstant, int level = 0);
 	void startMethodBody(std::ostream& stream, int level = 0);
-	void generateMethodBody(std::ostream& stream, int level = 0);
+	void generateMethodBody(std::ostream& stream, bool isVoid, int level = 0);
 	void endMethodBody(std::ostream& stream, int level = 0);
 	virtual void addParameter(std::ostream& stream, std::string type, std::string name, bool isLast = false) override;
 };

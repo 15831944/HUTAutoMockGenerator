@@ -46,10 +46,10 @@ void ClassSourceGenerator::startMethodBody(std::ostream& stream, int level)
 		<< HUT_Constants::EndLine;
 }
 
-void ClassSourceGenerator::generateMethodBody(std::ostream& stream, int level)
+void ClassSourceGenerator::generateMethodBody(std::ostream& stream, bool isVoid, int level)
 {
 	stream << tabIndent(level)
-		<< HUT_Constants::Return
+		<< (isVoid ? HUT_Constants::EmptyString : HUT_Constants::Return)
 		<< HUT_Constants::Space
 		<< m_mockClassName
 		<< HUT_Constants::ScopeResolutionOperator

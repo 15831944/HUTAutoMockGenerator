@@ -48,7 +48,7 @@ void ClangHandler::processMethod(CXCursor cursor, CXClientData ccd)
 			mmg.endMockMethod(cd->stream);
 			cd->csg->endMethodDefinition(cd->streamSource, clang_CXXMethod_isConst(cursor), cd->currentSourceIdent);
 			cd->csg->startMethodBody(cd->streamSource, cd->currentSourceIdent);
-			cd->csg->generateMethodBody(cd->streamSource, cd->currentSourceIdent + 1);
+			cd->csg->generateMethodBody(cd->streamSource, return_type.compare("void") == 0, cd->currentSourceIdent + 1);
 			cd->csg->endMethodBody(cd->streamSource, cd->currentSourceIdent);
 		}
 	}
@@ -231,15 +231,15 @@ char params[1][500] = {
 
 int ClangHandler::Process(int argc, char* argv[])
 {
-	std::string fileName(argv[1]);
-	std::string classToFind(argv[2]);
+	std::string fileName(argv[0]);
+	std::string classToFind(argv[1]);
 	std::string temp(classToFind.length(), 0);
 	std::transform(classToFind.begin(), classToFind.end(), temp.begin(), ::tolower);
 	if (temp.compare("all") == 0)
 	{
 		classToFind = "";
 	}
-	int offset = 4;
+	int offset = 3;
 	int newargc = argc - offset + 1;
 	char** newargv = new char* [newargc];
 	for (auto i = offset; i < argc; ++i)
@@ -248,7 +248,7 @@ int ClangHandler::Process(int argc, char* argv[])
 	}
 	newargv[newargc - 1] = params[0];
 
-	std::string destinationFolder(argv[3]);
+	std::string destinationFolder(argv[2]);
 
 	std::string onlyFileName = GetOnlyFileName(fileName);
 
@@ -282,7 +282,7 @@ int ClangHandler::Process(int argc, char* argv[])
 	ClassSourceGenerator csg("", "", "");
 	csg.AddInclude(cd.streamSource, GetFileNameFromPath(cd.currentFileName), cd.currentSourceIdent);
 
-	CXIndex index = clang_createIndex(0, 0);
+	CXIndex index = clang_createIndex(0, 1);
 	CXTranslationUnit unit;
 	
 	if (ParseAndCheck(fileName, newargc, newargv, index, unit))

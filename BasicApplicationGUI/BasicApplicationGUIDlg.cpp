@@ -77,6 +77,9 @@ BEGIN_MESSAGE_MAP(CBasicApplicationGUIDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_B_DESTINATION_FOLDER, &CBasicApplicationGUIDlg::OnBnClickedBDestinationFolder)
 	ON_BN_CLICKED(IDC_B_RESET, &CBasicApplicationGUIDlg::OnBnClickedBReset)
 	ON_EN_KILLFOCUS(IDC_TB_CLASS_NAME, &CBasicApplicationGUIDlg::OnEnChangeClassName)
+	ON_EN_KILLFOCUS(IDC_TB_OTHER_OPTIONS, &CBasicApplicationGUIDlg::OnEnChangeClassName)
+	
+	ON_CBN_SELCHANGE(IDC_COMBO_LISTMODE, &CBasicApplicationGUIDlg::OnCbnSelchangeComboListmode)
 END_MESSAGE_MAP()
 
 
@@ -112,6 +115,11 @@ BOOL CBasicApplicationGUIDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
+	CComboBoxEx* obj = (CComboBoxEx*)GetDlgItem(IDC_COMBO_LISTMODE);
+	obj->SetCurSel(0);
+
+	CStatic* staticText = (CStatic*)GetDlgItem(IDC_STATIC_SOURCE_FILE);
+	staticText->SetWindowTextA(staticSourceFileText);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -169,15 +177,11 @@ HCURSOR CBasicApplicationGUIDlg::OnQueryDragIcon()
 
 void CBasicApplicationGUIDlg::OnBnClickedProcess()
 {
+	Mode mode = GetCurrentMode();
 	UpdateData(true);
 	if (m_sourceFile.IsEmpty())
 	{
 		MessageBox("Source file field should not be empty.", "Error", MB_OK | MB_ICONERROR);
-		return;
-	}
-	else if (m_className.IsEmpty())
-	{
-		MessageBox("Class name field should not be empty.", "Error", MB_OK | MB_ICONERROR);
 		return;
 	}
 	else if (m_destinationFolder.IsEmpty())
@@ -185,65 +189,42 @@ void CBasicApplicationGUIDlg::OnBnClickedProcess()
 		MessageBox("Destination folder field should not be empty.", "Error", MB_OK | MB_ICONERROR);
 		return;
 	}
-	int argc = 3;
-	int sourceLength = sourceFileTag.length() + m_sourceFile.GetLength() + 1;
-	int classLength = classTag.length() + m_className.GetLength() + 1;
-	int destinationLength = destinationFolderTag.length() + m_destinationFolder.GetLength() + 1;
-	int otherOptionsLength = 0;
-	if (!m_otherOptions.IsEmpty())
-	{
-		argc++;
-		otherOptionsLength = m_otherOptions.GetLength() + 1;
-	}
-	char** argv = new char*[argc];
-	argv[0] = new char[sourceLength];
-	argv[1] = new char[classLength];
-	argv[2] = new char[destinationLength];
-	memset(argv[0], 0, sourceLength);
-	memset(argv[1], 0, classLength);
-	memset(argv[2], 0, destinationLength);
-	memcpy(argv[0], sourceFileTag.c_str(), sourceFileTag.length());
-	memcpy(&argv[0][sourceFileTag.length()], m_sourceFile.GetBuffer(), m_sourceFile.GetLength());
-	memcpy(argv[1], classTag.c_str(), classTag.length());
-	memcpy(&argv[1][classTag.length()], m_className.GetBuffer(), m_className.GetLength());
-	memcpy(argv[2], destinationFolderTag.c_str(), destinationFolderTag.length());
-	memcpy(&argv[2][destinationFolderTag.length()], m_destinationFolder.GetBuffer(), m_destinationFolder.GetLength());
 
-	if (argc = 4)
+	if (mode == Mode::SINGLE)
 	{
-		argv[3] = new char[otherOptionsLength];
-		memset(argv[3], 0, otherOptionsLength);
-		memcpy(argv[3], m_otherOptions.GetBuffer(), otherOptionsLength - 1);
-	}
-
-	if (HUTAutoMockGenerator(argc, argv) == 0)
-	{
-		MessageBox("Successfully generated mocks", "Success", MB_OK | MB_USERICON);
-		OnBnClickedBReset();
+		if (m_className.IsEmpty())
+		{
+			MessageBox("Class name field should not be empty.", "Error", MB_OK | MB_ICONERROR);
+			return;
+		}
+		Process(m_sourceFile, m_className, m_destinationFolder, m_otherOptions);
 	}
 	else
 	{
-		MessageBox("Failed to genearte mocks.", "Error", MB_OK | MB_ICONERROR);
+		MessageBox("This mode is not supported yet", "Info", MB_OK | MB_ICONINFORMATION);
 	}
-
-	delete[] argv[0];
-	delete[] argv[1];
-	delete[] argv[2];
-	if (argc = 4)
-	{
-		delete[] argv[3];
-	}
-	delete[] argv;
 }
 
 
 void CBasicApplicationGUIDlg::OnBnClickedBSourceFile()
 {
-	const TCHAR szFilter[] = _T("All Files (*.*)|*.*||");
-	CFileDialog dlg(true, _T("csv"), NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, this);
-	if (dlg.DoModal() == IDOK)
+	Mode mode = GetCurrentMode();
+	if (mode == Mode::SINGLE)
 	{
-		m_sourceFile = dlg.GetPathName();
+		const TCHAR szFilter[] = _T("Header Files (*.h;*.hpp)|*.h;*.hpp||");
+		CFileDialog dlg(true, _T("csv"), NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, this);
+		if (dlg.DoModal() == IDOK)
+		{
+			m_sourceFile = dlg.GetPathName();
+		}
+	}
+	else if (mode == Mode::ALL_IN_FOLDER)
+	{
+		CFolderPickerDialog dlg(nullptr, 0, this);
+		if (dlg.DoModal() == IDOK)
+		{
+			m_sourceFile = dlg.GetFolderPath();
+		}
 	}
 	UpdateData(false);
 }
@@ -279,5 +260,87 @@ void CBasicApplicationGUIDlg::OnEnChangeClassName()
 	obj->GetWindowTextA(m_destinationFolder);
 	obj = (CEdit*)GetDlgItem(IDC_TB_OTHER_OPTIONS);
 	obj->GetWindowTextA(m_otherOptions);
+	UpdateData(false);
+}
+
+CBasicApplicationGUIDlg::Mode CBasicApplicationGUIDlg::GetCurrentMode()
+{
+	CComboBoxEx* obj = (CComboBoxEx*)GetDlgItem(IDC_COMBO_LISTMODE);
+	return (Mode)obj->GetCurSel();
+}
+
+void CBasicApplicationGUIDlg::Process(CString source, CString className, CString destination, CString others)
+{
+	int argc = 3;
+	int sourceLength = sourceFileTag.length() + source.GetLength() + 1;
+	int classLength = classTag.length() + className.GetLength() + 1;
+	int destinationLength = destinationFolderTag.length() + destination.GetLength() + 1;
+	int otherOptionsLength = 0;
+	if (!others.IsEmpty())
+	{
+		argc++;
+		otherOptionsLength = others.GetLength() + 1;
+	}
+	char** argv = new char* [argc];
+	argv[0] = new char[sourceLength];
+	argv[1] = new char[classLength];
+	argv[2] = new char[destinationLength];
+	memset(argv[0], 0, sourceLength);
+	memset(argv[1], 0, classLength);
+	memset(argv[2], 0, destinationLength);
+	memcpy(argv[0], sourceFileTag.c_str(), sourceFileTag.length());
+	memcpy(&argv[0][sourceFileTag.length()], source.GetBuffer(), source.GetLength());
+	memcpy(argv[1], classTag.c_str(), classTag.length());
+	memcpy(&argv[1][classTag.length()], className.GetBuffer(), className.GetLength());
+	memcpy(argv[2], destinationFolderTag.c_str(), destinationFolderTag.length());
+	memcpy(&argv[2][destinationFolderTag.length()], destination.GetBuffer(), destination.GetLength());
+
+	if (argc = 4)
+	{
+		argv[3] = new char[otherOptionsLength];
+		memset(argv[3], 0, otherOptionsLength);
+		memcpy(argv[3], others.GetBuffer(), otherOptionsLength - 1);
+	}
+
+	if (HUTAutoMockGenerator(argc, argv) == 0)
+	{
+		MessageBox("Successfully generated mocks", "Success", MB_OK | MB_USERICON);
+		OnBnClickedBReset();
+	}
+	else
+	{
+		MessageBox("Failed to generate mocks.", "Error", MB_OK | MB_ICONERROR);
+	}
+
+	delete[] argv[0];
+	delete[] argv[1];
+	delete[] argv[2];
+	if (argc = 4)
+	{
+		delete[] argv[3];
+	}
+	delete[] argv;
+}
+
+void CBasicApplicationGUIDlg::OnCbnSelchangeComboListmode()
+{
+	Mode mode = GetCurrentMode();
+	CEdit* obj = (CEdit*)GetDlgItem(IDC_TB_CLASS_NAME);
+	if (mode == Mode::ALL_IN_FOLDER)
+	{
+		CStatic* staticText = (CStatic*)GetDlgItem(IDC_STATIC_SOURCE_FILE);
+		staticText->SetWindowTextA(staticSourceFolderText);
+		m_sourceFile = "";
+		m_className = "all";
+		obj->EnableWindow(false);
+	}
+	else if (mode == Mode::SINGLE)
+	{
+		CStatic* staticText = (CStatic*)GetDlgItem(IDC_STATIC_SOURCE_FILE);
+		staticText->SetWindowTextA(staticSourceFileText);
+		m_sourceFile = "";
+		m_className = "";
+		obj->EnableWindow(true);
+	}
 	UpdateData(false);
 }

@@ -10,6 +10,15 @@ class CBasicApplicationGUIDlg : public CDialogEx
 {
 // Construction
 public:
+	const CString staticSourceFileText = "Source File:";
+	const CString staticSourceFolderText = "Source Folder:";
+	enum class Mode
+	{
+		SINGLE,
+		ALL_IN_FOLDER,
+		FULL
+	};
+
 	CBasicApplicationGUIDlg(CWnd* pParent = nullptr);	// standard constructor
 
 // Dialog Data
@@ -38,10 +47,14 @@ private:
 	CString m_destinationFolder;
 	CString m_otherOptions;
 
+	Mode GetCurrentMode();
+	void Process(CString source, CString className, CString destination, CString others);
+
 public:
 	afx_msg void OnBnClickedProcess();
 	afx_msg void OnBnClickedBSourceFile();
 	afx_msg void OnBnClickedBDestinationFolder();
 	afx_msg void OnBnClickedBReset();
 	afx_msg void OnEnChangeClassName();
+	afx_msg void OnCbnSelchangeComboListmode();
 };

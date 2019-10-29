@@ -48,7 +48,9 @@ private:
 	CString m_otherOptions;
 
 	Mode GetCurrentMode();
-	void Process(CString source, CString className, CString destination, CString others);
+	int Process(CString source, CString className, CString destination, CString others);
+	void AfterProcess(int res);
+	int TraverseDirectory(CString source, CString className, CString destination, CString others, bool isSubFolder = false);
 
 public:
 	afx_msg void OnBnClickedProcess();

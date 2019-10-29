@@ -8,8 +8,10 @@
 #include "BasicApplicationGUIDlg.h"
 #include "afxdialogex.h"
 #include "HUTAutoMockGenerator.h"
+#include <iostream>
 #include <ostream>
 #include <string>
+#include <filesystem>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -197,12 +199,39 @@ void CBasicApplicationGUIDlg::OnBnClickedProcess()
 			MessageBox("Class name field should not be empty.", "Error", MB_OK | MB_ICONERROR);
 			return;
 		}
-		Process(m_sourceFile, m_className, m_destinationFolder, m_otherOptions);
+		AfterProcess(Process(m_sourceFile, m_className, m_destinationFolder, m_otherOptions));
+	}
+	else if (mode == Mode::ALL_IN_FOLDER)
+	{
+		AfterProcess(TraverseDirectory(m_sourceFile, m_className, m_destinationFolder, m_otherOptions));
 	}
 	else
 	{
 		MessageBox("This mode is not supported yet", "Info", MB_OK | MB_ICONINFORMATION);
 	}
+}
+
+int CBasicApplicationGUIDlg::TraverseDirectory(CString source, CString className, CString destination, CString others, bool isSubFolder)
+{
+	int res = 0;
+	for (const auto & entry : std::filesystem::directory_iterator(source.GetBuffer()))
+	{
+		if (entry.is_regular_file())
+		{
+			CString pt(entry.path().extension().c_str());
+			pt.MakeLower();
+			if (pt.Compare(".h") == 0 || pt.Compare(".hpp") == 0)
+			{
+				res = res | Process(CString(entry.path().c_str()), className, destination, others);
+			}
+		}
+		else if (entry.is_directory() && isSubFolder)
+		{
+			CString pt(entry.path().extension().c_str());
+			res = res | TraverseDirectory(pt, className, destination, others);
+		}
+	}
+	return res;
 }
 
 
@@ -269,7 +298,7 @@ CBasicApplicationGUIDlg::Mode CBasicApplicationGUIDlg::GetCurrentMode()
 	return (Mode)obj->GetCurSel();
 }
 
-void CBasicApplicationGUIDlg::Process(CString source, CString className, CString destination, CString others)
+int CBasicApplicationGUIDlg::Process(CString source, CString className, CString destination, CString others)
 {
 	int argc = 3;
 	int sourceLength = sourceFileTag.length() + source.GetLength() + 1;
@@ -301,16 +330,8 @@ void CBasicApplicationGUIDlg::Process(CString source, CString className, CString
 		memset(argv[3], 0, otherOptionsLength);
 		memcpy(argv[3], others.GetBuffer(), otherOptionsLength - 1);
 	}
-
-	if (HUTAutoMockGenerator(argc, argv) == 0)
-	{
-		MessageBox("Successfully generated mocks", "Success", MB_OK | MB_USERICON);
-		OnBnClickedBReset();
-	}
-	else
-	{
-		MessageBox("Failed to generate mocks.", "Error", MB_OK | MB_ICONERROR);
-	}
+	
+	int res = HUTAutoMockGenerator(argc, argv);
 
 	delete[] argv[0];
 	delete[] argv[1];
@@ -320,6 +341,21 @@ void CBasicApplicationGUIDlg::Process(CString source, CString className, CString
 		delete[] argv[3];
 	}
 	delete[] argv;
+
+	return res;
+}
+
+void CBasicApplicationGUIDlg::AfterProcess(int res)
+{
+	if (res == 0)
+	{
+		MessageBox("Successfully generated mocks", "Success", MB_OK | MB_USERICON);
+		OnBnClickedBReset();
+	}
+	else
+	{
+		MessageBox("Failed to generate mocks.", "Error", MB_OK | MB_ICONERROR);
+	}
 }
 
 void CBasicApplicationGUIDlg::OnCbnSelchangeComboListmode()
